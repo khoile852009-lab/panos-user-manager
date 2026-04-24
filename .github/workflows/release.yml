@@ -10,18 +10,11 @@ permissions:
   id-token: write
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            artifact_name: panos_manage_user.exe
-            asset_name: panos_manage_user-windows.exe
-          - os: ubuntu-latest
-            artifact_name: panos_manage_user
-            asset_name: panos_manage_user-linux
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
 
     steps:
       - name: Checkout
@@ -36,7 +29,6 @@ jobs:
         run: pip install pyinstaller
 
       - name: Generate Windows version info
-        if: matrix.os == 'windows-latest'
         shell: python
         run: |
           import os
@@ -67,8 +59,7 @@ jobs:
           with open('version_info.txt', 'w') as f:
               f.write(content)
 
-      - name: Build binary (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build binary
         run: >
           pyinstaller
           --onefile
@@ -78,8 +69,31 @@ jobs:
           --clean
           panos_manage_user.py
 
-      - name: Build binary (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: panos_manage_user-windows.exe
+          path: dist/panos_manage_user.exe
+          retention-days: 1
+
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build binary
         run: >
           pyinstaller
           --onefile
@@ -90,13 +104,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.artifact_name }}
+          name: panos_manage_user-linux
+          path: dist/panos_manage_user
           retention-days: 1
 
   sign-windows:
     name: Sign Windows Binary
-    needs: build
+    needs: build-windows
     runs-on: ubuntu-latest
 
     steps:
@@ -105,10 +119,10 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: panos-user-manager
+          project-slug: panos_user_manager
           signing-policy-slug: release-signing
           artifact-configuration-slug: exe
-          github-artifact-id: panos_manage_user-windows.exe
+          github-artifact-id: ${{ needs.build-windows.outputs.artifact-id }}
           wait-for-completion: true
           output-artifact-directory: signed/
 
@@ -121,7 +135,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: sign-windows
+    needs: [sign-windows, build-linux]
     runs-on: ubuntu-latest
 
     steps:
