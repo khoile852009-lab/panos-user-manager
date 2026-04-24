@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -34,7 +35,51 @@ jobs:
       - name: Install PyInstaller
         run: pip install pyinstaller
 
-      - name: Build binary
+      - name: Generate Windows version info
+        if: matrix.os == 'windows-latest'
+        shell: python
+        run: |
+          import os
+          ref = os.environ.get('GITHUB_REF_NAME', 'v1.0.0').lstrip('v')
+          parts = (ref.split('.') + ['0', '0', '0', '0'])[:4]
+          tup = ', '.join(parts)
+          content = f"""VSVersionInfo(
+            ffi=FixedFileInfo(
+              filevers=({tup}),
+              prodvers=({tup}),
+              mask=0x3f, flags=0x0, OS=0x40004,
+              fileType=0x1, subtype=0x0, date=(0, 0)
+            ),
+            kids=[
+              StringFileInfo([StringTable(u'040904B0', [
+                StringStruct(u'CompanyName',      u'The Cyber Defenders'),
+                StringStruct(u'FileDescription',  u'PAN-OS User Manager'),
+                StringStruct(u'FileVersion',      u'{ref}'),
+                StringStruct(u'InternalName',     u'panos_manage_user'),
+                StringStruct(u'LegalCopyright',   u'\\u00a9 2026 The Cyber Defenders'),
+                StringStruct(u'OriginalFilename', u'panos_manage_user.exe'),
+                StringStruct(u'ProductName',      u'PAN-OS User Manager'),
+                StringStruct(u'ProductVersion',   u'{ref}'),
+              ])]),
+              VarFileInfo([VarStruct(u'Translation', [0x0409, 1200])])
+            ]
+          )"""
+          with open('version_info.txt', 'w') as f:
+              f.write(content)
+
+      - name: Build binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: >
+          pyinstaller
+          --onefile
+          --name panos_manage_user
+          --icon cd.ico
+          --version-file version_info.txt
+          --clean
+          panos_manage_user.py
+
+      - name: Build binary (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: >
           pyinstaller
           --onefile
@@ -49,22 +94,54 @@ jobs:
           path: dist/${{ matrix.artifact_name }}
           retention-days: 1
 
-  release:
-    name: Create Release
+  sign-windows:
+    name: Sign Windows Binary
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: panos-user-manager
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: exe
+          github-artifact-id: panos_manage_user-windows.exe
+          wait-for-completion: true
+          output-artifact-directory: signed/
+
+      - name: Upload signed exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: panos_manage_user-windows-signed.exe
+          path: signed/panos_manage_user.exe
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: sign-windows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download signed Windows binary
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          name: panos_manage_user-windows-signed.exe
+          path: artifacts/windows/
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: panos_manage_user-linux
+          path: artifacts/linux/
 
       - name: Prepare release files
         run: |
           mkdir dist
-          mv artifacts/panos_manage_user-windows.exe/panos_manage_user.exe dist/panos_manage_user-windows.exe
-          mv artifacts/panos_manage_user-linux/panos_manage_user dist/panos_manage_user-linux
+          mv artifacts/windows/panos_manage_user.exe dist/panos_manage_user-windows.exe
+          mv artifacts/linux/panos_manage_user dist/panos_manage_user-linux
           chmod +x dist/panos_manage_user-linux
 
       - name: Create GitHub Release
