@@ -1,0 +1,3 @@
+# Panorama hosts - one per line
+# Lines starting with # are ignored
+# Format: hostname or IP address

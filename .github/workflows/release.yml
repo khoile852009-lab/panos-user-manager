@@ -1,0 +1,105 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: panos_manage_user.exe
+            asset_name: panos_manage_user-windows.exe
+          - os: ubuntu-latest
+            artifact_name: panos_manage_user
+            asset_name: panos_manage_user-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build binary
+        run: >
+          pyinstaller
+          --onefile
+          --name panos_manage_user
+          --clean
+          panos_manage_user.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.artifact_name }}
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Rename artifacts for release
+        run: |
+          mv dist/panos_manage_user-windows.exe/panos_manage_user.exe  dist/panos_manage_user-windows.exe.bin
+          mv dist/panos_manage_user-linux/panos_manage_user              dist/panos_manage_user-linux.bin
+          mv dist/panos_manage_user-windows.exe.bin dist/panos_manage_user-windows.exe
+          mv dist/panos_manage_user-linux.bin       dist/panos_manage_user-linux
+          chmod +x dist/panos_manage_user-linux
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          body: |
+            ## PAN-OS User Manager ${{ github.ref_name }}
+
+            Manage local admin accounts on PAN-OS firewalls and Panorama via the XML API.
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Windows  | `panos_manage_user-windows.exe` |
+            | Linux    | `panos_manage_user-linux` |
+
+            ### Quick start
+
+            **Windows**
+            ```
+            panos_manage_user-windows.exe --firewall hosts.txt --auth admin --operation list
+            ```
+
+            **Linux**
+            ```
+            chmod +x panos_manage_user-linux
+            ./panos_manage_user-linux --firewall hosts.txt --auth admin --operation list
+            ```
+
+            See the [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full usage.
+          files: |
+            dist/panos_manage_user-windows.exe
+            dist/panos_manage_user-linux
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
