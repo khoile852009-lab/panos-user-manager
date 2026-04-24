@@ -58,14 +58,13 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist/
+          path: artifacts/
 
-      - name: Rename artifacts for release
+      - name: Prepare release files
         run: |
-          mv dist/panos_manage_user-windows.exe/panos_manage_user.exe  dist/panos_manage_user-windows.exe.bin
-          mv dist/panos_manage_user-linux/panos_manage_user              dist/panos_manage_user-linux.bin
-          mv dist/panos_manage_user-windows.exe.bin dist/panos_manage_user-windows.exe
-          mv dist/panos_manage_user-linux.bin       dist/panos_manage_user-linux
+          mkdir dist
+          mv artifacts/panos_manage_user-windows.exe/panos_manage_user.exe dist/panos_manage_user-windows.exe
+          mv artifacts/panos_manage_user-linux/panos_manage_user dist/panos_manage_user-linux
           chmod +x dist/panos_manage_user-linux
 
       - name: Create GitHub Release
