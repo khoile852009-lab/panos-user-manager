@@ -27,7 +27,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install PyInstaller
-        run: pip install pyinstaller
+        run: pip install pyinstaller openpyxl
 
       - name: Generate Windows version info
         shell: python
@@ -92,7 +92,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install PyInstaller
-        run: pip install pyinstaller
+        run: pip install pyinstaller openpyxl
 
       - name: Build binary
         run: >
