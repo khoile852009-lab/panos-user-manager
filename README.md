@@ -1,3 +1,7 @@
+[![GitHub Release](https://img.shields.io/github/release/snell-evan-itt/panos-user-manager.svg?style=for-the-badge&color=blue)](https://github.com/snell-evan-itt/panos-user-manager/releases)
+[![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/snell-evan-itt/panos-user-manager/total?style=for-the-badge)](https://github.com/snell-evan-itt/panos-user-manager/releases/latest)
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/snell.evan.itt)
+
 # PAN-OS User Manager
 
 A single-file CLI tool for managing local administrator accounts on Palo Alto Networks firewalls and Panorama via the XML API. No third-party libraries required — pure Python 3 stdlib.
