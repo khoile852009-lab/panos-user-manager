@@ -4,8 +4,8 @@ panos_manage_user.py - Manage local admin accounts on PAN-OS firewalls or Panora
 
 Usage:
     python panos_manage_user.py --firewall hosts.txt --auth admin:password --operation list
-    python panos_manage_user.py --panorama hosts.txt --auth-api-key APIKEY --operation create --username bob --password P@ss --role superuser
-    python panos_manage_user.py --firewall hosts.txt --auth admin:password --operation update --username bob --password NewP@ss
+    python panos_manage_user.py --panorama hosts.txt --auth-api-key APIKEY --operation create --username bob --role superuser
+    python panos_manage_user.py --firewall hosts.txt --auth admin:password --operation update --username bob
     python panos_manage_user.py --panorama hosts.txt --auth admin:password --operation delete --username bob
 
 Supported roles:
@@ -25,10 +25,18 @@ from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
+
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
 ADMIN_XPATH = "/config/mgt-config/users"
+TEMPLATE_BASE_XPATH = "/config/devices/entry[@name='localhost.localdomain']/template"
 W = 68  # output width
 
 
@@ -161,22 +169,58 @@ def _build_role_element(role: str) -> ET.Element:
     return permissions
 
 
-# ── operations ───────────────────────────────────────────────────────────────
+# ── template helpers ─────────────────────────────────────────────────────────
 
-def op_list(host: str, headers: dict) -> bool:
+def template_admin_xpath(template_name: str) -> str:
+    """Return the mgt-config/users XPath inside a specific device template."""
+    return (
+        f"{TEMPLATE_BASE_XPATH}/entry[@name='{template_name}']"
+        "/config/mgt-config/users"
+    )
+
+
+def get_template_names(host: str, headers: dict) -> list:
+    """Return all device-template names from a Panorama."""
     try:
         root = api_request(host, {
             "type": "config",
             "action": "get",
-            "xpath": ADMIN_XPATH,
+            "xpath": TEMPLATE_BASE_XPATH,
         }, headers)
     except RuntimeError as e:
+        fail(f"Could not retrieve device templates: {e}")
+        return []
+    # Only grab direct <entry> children of <template>, not nested entries
+    template_node = root.find(".//template")
+    if template_node is None:
+        # API may return <result><template><entry ...>... so try result/entry
+        template_node = root.find(".//result")
+    if template_node is None:
+        return []
+    return [e.get("name") for e in template_node.findall("entry") if e.get("name")]
+
+
+# ── operations ───────────────────────────────────────────────────────────────
+
+def op_list(host: str, headers: dict, xpath: str = ADMIN_XPATH, label: str = "") -> bool:
+    if label:
+        info(label)
+    try:
+        root = api_request(host, {
+            "type": "config",
+            "action": "get",
+            "xpath": xpath,
+        }, headers)
+    except RuntimeError as e:
+        if "No such node" in str(e) or "Object not found" in str(e):
+            info("  No local admins" if label else "No local admins found")
+            return True
         fail(f"Could not retrieve users: {e}")
         return False
 
     entries = root.findall(".//entry")
     if not entries:
-        info("No local admins found")
+        info("  No local admins" if label else "No local admins found")
         return True
 
     for entry in entries:
@@ -186,7 +230,64 @@ def op_list(host: str, headers: dict) -> bool:
     return True
 
 
-def op_create(host: str, headers: dict, username: str, password: str, role: str) -> bool:
+def collect_list(host: str, headers: dict, xpath: str = ADMIN_XPATH,
+                 label: str = "") -> list:
+    """Return a list of (scope_label, username, role) tuples for xlsx output."""
+    rows = []
+    try:
+        root = api_request(host, {
+            "type": "config",
+            "action": "get",
+            "xpath": xpath,
+        }, headers)
+    except RuntimeError:
+        return rows
+
+    for entry in root.findall(".//entry"):
+        name = entry.get("name", "?")
+        role = _parse_role(entry)
+        rows.append((label or "Panorama-level", name, role))
+    return rows
+
+
+def write_xlsx(path: str, host_data: dict) -> None:
+    """Write collected list data to an xlsx file (one sheet per host)."""
+    wb = Workbook()
+    # Remove the default sheet created by openpyxl
+    wb.remove(wb.active)
+
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
+    for host, rows in host_data.items():
+        # Sheet names limited to 31 chars and certain chars are invalid
+        sheet_name = host[:31].replace("/", "_").replace("\\", "_").replace(":", "_")
+        ws = wb.create_sheet(title=sheet_name)
+
+        headers_row = ["Scope", "Username", "Role"]
+        ws.append(headers_row)
+        for col_idx in range(1, len(headers_row) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="left")
+
+        if rows:
+            for scope_label, username, role in rows:
+                ws.append([scope_label, username, role])
+        else:
+            ws.append(["(no local admins found)", "", ""])
+
+        # Auto-fit column widths
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = max_len + 3
+
+    wb.save(path)
+
+
+def op_create(host: str, headers: dict, username: str, password: str, role: str,
+              xpath: str = ADMIN_XPATH) -> bool:
     try:
         info("Hashing password...")
         phash = hash_password(host, headers, password)
@@ -199,7 +300,7 @@ def op_create(host: str, headers: dict, username: str, password: str, role: str)
         api_request(host, {
             "type": "config",
             "action": "set",
-            "xpath": ADMIN_XPATH,
+            "xpath": xpath,
             "element": ET.tostring(entry, encoding="unicode"),
         }, headers)
         ok(f"User '{username}' created  (role={role})")
@@ -210,12 +311,13 @@ def op_create(host: str, headers: dict, username: str, password: str, role: str)
 
 
 def op_update(host: str, headers: dict, username: str,
-              password: Optional[str], role: Optional[str]) -> bool:
+              password: Optional[str], role: Optional[str],
+              xpath: str = ADMIN_XPATH) -> bool:
     if not password and not role:
         info("Nothing to update — pass --password and/or --role")
         return True
 
-    xpath_entry = f"{ADMIN_XPATH}/entry[@name='{username}']"
+    xpath_entry = f"{xpath}/entry[@name='{username}']"
 
     try:
         api_request(host, {"type": "config", "action": "get", "xpath": xpath_entry}, headers)
@@ -254,8 +356,8 @@ def op_update(host: str, headers: dict, username: str,
         return False
 
 
-def op_delete(host: str, headers: dict, username: str) -> bool:
-    xpath_entry = f"{ADMIN_XPATH}/entry[@name='{username}']"
+def op_delete(host: str, headers: dict, username: str, xpath: str = ADMIN_XPATH) -> bool:
+    xpath_entry = f"{xpath}/entry[@name='{username}']"
     try:
         api_request(host, {
             "type": "config",
@@ -406,12 +508,22 @@ def main():
                         choices=["list", "create", "update", "delete"])
     parser.add_argument("--username", help="Target username (required for create/update/delete)")
     parser.add_argument("--password", help="Password (required for create, optional for update)")
-    parser.add_argument("--role", default="superuser",
-                        help="Role: superuser, superreader, device-admin, device-admin-read-only, "
-                             "or a custom admin role profile name (default: superuser)")
+    parser.add_argument("--role", default=None,
+                        help="Role: superuser (default for create), superreader, device-admin, "
+                             "device-admin-read-only, or a custom admin role profile name")
     parser.add_argument("--commit", action="store_true",
                         help="Partial-commit after each change using the login admin from --auth "
                              "(full commit when using --auth-api-key)")
+    parser.add_argument("--output-xlsx", metavar="FILE",
+                        help="Write list results to an xlsx file (one sheet per host). "
+                             "Requires openpyxl: pip install openpyxl")
+    parser.add_argument("--scope", choices=["panorama", "templates", "all"], default="panorama",
+                        help="Scope: panorama (default), templates (device templates only), "
+                             "or all (panorama-level + all device templates). "
+                             "templates/all require --panorama.")
+    parser.add_argument("--template", metavar="NAME",
+                        help="Target a single device template by name "
+                             "(used with --scope templates|all; omit to target all templates)")
 
     args = parser.parse_args()
 
@@ -419,6 +531,14 @@ def main():
         parser.error(f"--username is required for {args.operation}")
 
     device_type = "panorama" if args.panorama else "firewall"
+
+    if args.scope != "panorama" and device_type != "panorama":
+        parser.error("--scope templates/all is only valid with --panorama")
+    if args.output_xlsx and args.operation != "list":
+        parser.error("--output-xlsx is only valid with --operation list")
+    if args.output_xlsx and not HAS_OPENPYXL:
+        print("ERROR: openpyxl is required for xlsx output.  pip install openpyxl")
+        sys.exit(1)
     host_file = args.panorama or args.firewall
     hosts = load_hosts(host_file)
     if not hosts:
@@ -430,44 +550,88 @@ def main():
 
     # Resolve target user password if needed — may prompt interactively
     user_password = ""
-    if args.operation in ("create", "update"):
+    if args.operation == "create":
         user_password = resolve_user_password(args)
+    elif args.operation == "update":
+        # Password is optional for update; only prompt when explicitly needed
+        user_password = args.password or os.environ.get("PANOS_USER_PASSWORD", "")
 
     col = 22
     banner("PAN-OS User Manager")
     print(f"  {'Operation':<{col}} {args.operation.upper()}")
     print(f"  {'Device type':<{col}} {device_type}")
+    if args.scope != "panorama":
+        scope_label = args.template or "all templates"
+        print(f"  {'Scope':<{col}} {args.scope}  ({scope_label})")
     print(f"  {'Hosts':<{col}} {len(hosts)}")
     if args.username:
         print(f"  {'Target user':<{col}} {args.username}")
-    if args.operation in ("create", "update") and args.role:
-        print(f"  {'Role':<{col}} {args.role}")
+    effective_role = args.role or ("superuser" if args.operation == "create" else None)
+    if effective_role:
+        print(f"  {'Role':<{col}} {effective_role}")
     if args.commit:
-        scope = f"partial (admin={commit_admin})" if commit_admin else "full"
-        print(f"  {'Commit':<{col}} {scope}")
+        commit_scope = f"partial (admin={commit_admin})" if commit_admin else "full"
+        print(f"  {'Commit':<{col}} {commit_scope}")
     print("=" * W)
 
     results = []
+    xlsx_data: dict = {}  # host -> [(scope, user, role), ...]
 
     for i, host in enumerate(hosts, 1):
         section(host, i, len(hosts))
-        op_ok = False
+        op_ok = True
         commit_ok = None
 
-        if args.operation == "list":
-            op_ok = op_list(host, headers)
-        elif args.operation == "create":
-            op_ok = op_create(host, headers, args.username, user_password, args.role)
-        elif args.operation == "update":
-            op_ok = op_update(host, headers, args.username, user_password,
-                              args.role if args.role != "superuser" else None)
-        elif args.operation == "delete":
-            op_ok = op_delete(host, headers, args.username)
+        # Build (xpath, label) pairs based on --scope / --template
+        scope_targets: list = []
+        if args.scope in ("panorama", "all"):
+            scope_targets.append((ADMIN_XPATH, "Panorama-level"))
+        if device_type == "panorama" and args.scope in ("templates", "all"):
+            if args.template:
+                scope_targets.append((template_admin_xpath(args.template), f"Template: {args.template}"))
+            else:
+                template_names = get_template_names(host, headers)
+                if not template_names:
+                    info("No device templates found")
+                for t in template_names:
+                    scope_targets.append((template_admin_xpath(t), f"Template: {t}"))
+
+        host_rows: list = []
+        multi = len(scope_targets) > 1
+        for xpath, label in scope_targets:
+            scope_label = label if multi else ""
+            if args.operation == "list":
+                scope_ok = op_list(host, headers, xpath, scope_label)
+                if args.output_xlsx:
+                    host_rows.extend(collect_list(host, headers, xpath, scope_label))
+            elif args.operation == "create":
+                if multi:
+                    info(label)
+                scope_ok = op_create(host, headers, args.username, user_password, args.role or "superuser", xpath)
+            elif args.operation == "update":
+                if multi:
+                    info(label)
+                scope_ok = op_update(host, headers, args.username, user_password or None,
+                                     args.role, xpath)
+            elif args.operation == "delete":
+                if multi:
+                    info(label)
+                scope_ok = op_delete(host, headers, args.username, xpath)
+            else:
+                scope_ok = True
+            op_ok = op_ok and scope_ok
+
+        if args.output_xlsx:
+            xlsx_data[host] = host_rows
 
         if args.commit and args.operation != "list":
             commit_ok = do_commit(host, headers, commit_admin)
 
         results.append({"host": host, "op_ok": op_ok, "commit_ok": commit_ok})
+
+    if args.output_xlsx:
+        write_xlsx(args.output_xlsx, xlsx_data)
+        ok(f"Wrote {len(xlsx_data)} sheet(s) to {args.output_xlsx}")
 
     if args.operation != "list":
         print_summary(results, args.operation)

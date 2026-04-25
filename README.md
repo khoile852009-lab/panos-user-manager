@@ -155,6 +155,40 @@ Replace `--firewall` with `--panorama`:
 panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list
 ```
 
+By default only **Panorama-level** admin accounts are shown. Use `--scope` to also include device-template admins.
+
+```bash
+# Panorama-level admins only (default)
+panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope panorama
+
+# All device-template admins only
+panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope templates
+
+# Panorama-level + all device-template admins
+panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope all
+
+# Target a single named template
+panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list \
+  --scope templates --template MyTemplate
+```
+
+`--scope templates` and `--scope all` require `--panorama`. You can combine `--scope` with any operation (list, create, update, delete), and `--commit` works across all scopes.
+
+### Export list results to Excel
+
+Requires `openpyxl`:
+
+```bash
+pip install openpyxl
+```
+
+```bash
+panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list \
+  --scope all --output-xlsx admins.xlsx
+```
+
+One worksheet is created per host, with columns for Scope, Username, and Role.
+
 ---
 
 ## Roles
@@ -179,6 +213,9 @@ usage: panos_manage_user [--firewall FILE | --panorama FILE]
                          [--password PASSWORD]
                          [--role ROLE]
                          [--commit]
+                         [--scope {panorama,templates,all}]
+                         [--template NAME]
+                         [--output-xlsx FILE]
 
 options:
   --firewall FILE        File of firewall hostnames/IPs (mutually exclusive with --panorama)
@@ -191,10 +228,20 @@ options:
 
   --operation            One of: list, create, update, delete
   --username USERNAME    Target admin account name (required for create/update/delete)
-  --password PASSWORD    Password for the target account. Prompted if omitted.
-                         Env var: PANOS_USER_PASSWORD
-  --role ROLE            Admin role (default: superuser). See Roles table above.
+  --password PASSWORD    Password for the target account (required for create, optional for
+                         update). Prompted for create if omitted. Env var: PANOS_USER_PASSWORD
+  --role ROLE            Admin role (default for create: superuser). See Roles table above.
+                         For update, omitting --role leaves the existing role unchanged.
   --commit               Commit candidate config after each change.
+
+  --scope                panorama (default) | templates | all
+                         Controls which admin stores are targeted on Panorama hosts.
+                         templates/all require --panorama.
+  --template NAME        Target a single device template by name. Used with
+                         --scope templates|all; omit to target all templates.
+  --output-xlsx FILE     Write list results to an xlsx file (one sheet per host).
+                         Requires openpyxl (pip install openpyxl). Only valid with
+                         --operation list.
 ```
 
 ---
@@ -241,7 +288,7 @@ options:
 
 ## Notes
 
-- The tool disables SSL certificate verification to support self-signed management certs. Do not expose the management interface to untrusted networks.
+- HTTPS is used for all API calls. SSL certificate verification is performed by Python's default trust store. If your management interface uses a self-signed cert, import it into your OS trust store or replace it with a signed cert before using this tool.
 - Commit polling waits up to 3 minutes (60 × 3 s). If a commit job is still running after that, you will be warned to check the device manually.
 - Partial commit requires the login admin to have pending changes. If there are no pending changes, the device returns no job ID and the tool reports that gracefully.
 
