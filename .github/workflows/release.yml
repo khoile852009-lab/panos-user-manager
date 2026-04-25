@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: panos_manage_user-windows.exe
           path: dist/panos_manage_user.exe
@@ -87,7 +87,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -103,7 +103,7 @@ jobs:
           panos_manage_user.py
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: panos_manage_user-linux
           path: dist/panos_manage_user
@@ -118,7 +118,7 @@ jobs:
 
     steps:
       - name: Download Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3.1.0
         with:
           name: panos_manage_user-windows.exe
           path: artifacts/windows/
@@ -137,7 +137,7 @@ jobs:
           chmod +x dist/panos_manage_user-linux
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.0
         with:
           name: "Release ${{ github.ref_name }}"
           body: |
