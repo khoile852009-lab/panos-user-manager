@@ -109,41 +109,18 @@ jobs:
           path: dist/panos_manage_user
           retention-days: 1
 
-  sign-windows:
-    name: Sign Windows Binary
-    needs: build-windows
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Submit signing request to SignPath
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: panos_user_manager
-          signing-policy-slug: release-signing
-          artifact-configuration-slug: exe
-          github-artifact-id: ${{ needs.build-windows.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed/
-
-      - name: Upload signed exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: panos_manage_user-windows-signed.exe
-          path: signed/panos_manage_user.exe
-          retention-days: 1
+  # sign-windows job disabled pending SignPath open-source account upgrade
 
   release:
     name: Create Release
-    needs: [sign-windows, build-linux]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download signed Windows binary
+      - name: Download Windows binary
         uses: actions/download-artifact@v4
         with:
-          name: panos_manage_user-windows-signed.exe
+          name: panos_manage_user-windows.exe
           path: artifacts/windows/
 
       - name: Download Linux binary
