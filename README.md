@@ -4,7 +4,7 @@
 
 # PAN-OS User Manager
 
-A single-file CLI tool for managing local administrator accounts on Palo Alto Networks firewalls and Panorama via the XML API. No third-party libraries required — pure Python 3 stdlib.
+A single-file CLI tool for managing local administrator accounts on Palo Alto Networks firewalls and Panorama via the XML API.
 
 ## Features
 
