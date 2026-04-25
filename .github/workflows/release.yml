@@ -70,6 +70,21 @@ jobs:
           --clean
           panos_manage_user.py
 
+      - name: Sign binary
+        env:
+          CODESIGN_PFX_B64: ${{ secrets.CODESIGN_PFX_B64 }}
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        shell: powershell
+        run: |
+          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODESIGN_PFX_B64))
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Sort-Object FullName | Select-Object -Last 1).FullName
+          & $signtool sign /fd SHA256 /p "$env:CODESIGN_PFX_PASSWORD" /f $pfxPath `
+            /d "PAN-OS User Manager" /du "https://github.com/${{ github.repository }}" `
+            dist\panos_manage_user.exe
+          Remove-Item $pfxPath -Force
+
       - name: Upload artifact
         id: upload
         uses: actions/upload-artifact@v7.0.1
@@ -136,6 +151,16 @@ jobs:
           mv artifacts/linux/panos_manage_user dist/panos_manage_user-linux
           chmod +x dist/panos_manage_user-linux
 
+      - name: Sign release binaries
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --yes --detach-sign --armor dist/panos_manage_user-windows.exe
+          gpg --batch --yes --detach-sign --armor dist/panos_manage_user-linux
+          mv dist/panos_manage_user-windows.exe.asc dist/panos_manage_user-windows.exe.sig
+          mv dist/panos_manage_user-linux.asc dist/panos_manage_user-linux.sig
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3.0.0
         with:
@@ -147,10 +172,23 @@ jobs:
 
             ### Downloads
 
-            | Platform | File |
-            |----------|------|
-            | Windows  | `panos_manage_user-windows.exe` |
-            | Linux    | `panos_manage_user-linux` |
+            | Platform | File | Signature |
+            |----------|------|-----------|
+            | Windows  | `panos_manage_user-windows.exe` | `panos_manage_user-windows.exe.sig` |
+            | Linux    | `panos_manage_user-linux` | `panos_manage_user-linux.sig` |
+
+            ### Verify signatures
+
+            ```bash
+            # Import the public key (first time only)
+            gpg --keyserver keys.openpgp.org --recv-keys 8E234342277586D9
+
+            # Verify Windows binary
+            gpg --verify panos_manage_user-windows.exe.sig panos_manage_user-windows.exe
+
+            # Verify Linux binary
+            gpg --verify panos_manage_user-linux.sig panos_manage_user-linux
+            ```
 
             ### Quick start
 
@@ -169,5 +207,7 @@ jobs:
           files: |
             dist/panos_manage_user-windows.exe
             dist/panos_manage_user-linux
+            dist/panos_manage_user-windows.exe.sig
+            dist/panos_manage_user-linux.sig
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -293,14 +293,3 @@ options:
 - Partial commit requires the login admin to have pending changes. If there are no pending changes, the device returns no job ID and the tool reports that gracefully.
 
 ---
-
-## Creating a release
-
-Tag a commit and push the tag — GitHub Actions builds both binaries and publishes the release automatically.
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Pre-release builds are detected automatically: any tag containing `-` (e.g. `v1.1.0-beta`) is marked as a pre-release.
