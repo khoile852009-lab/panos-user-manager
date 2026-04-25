@@ -382,7 +382,7 @@ def do_commit(host: str, headers: dict, admin_user: Optional[str]) -> bool:
         member = ET.SubElement(admins, "member")
         member.text = admin_user
 
-    scope = f"partial (admin={admin_user})" if admin_user else "full"
+    scope = "partial" if admin_user else "full"
 
     try:
         resp = api_request(host, {
