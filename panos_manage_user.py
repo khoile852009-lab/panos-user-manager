@@ -570,7 +570,7 @@ def main():
     if effective_role:
         print(f"  {'Role':<{col}} {effective_role}")
     if args.commit:
-        commit_scope = f"partial (admin={commit_admin})" if commit_admin else "full"
+        commit_scope = "partial" if commit_admin else "full"
         print(f"  {'Commit':<{col}} {commit_scope}")
     print("=" * W)
 
