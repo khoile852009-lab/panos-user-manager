@@ -257,21 +257,21 @@ options:
   Hosts                  2
   Target user            jsmith
   Role                   superuser
-  Commit                 partial (admin=admin)
+  Commit                 partial
 ====================================================================
 
 [1/2] 192.168.1.1
 --------------------------------------------------------------------
   ... Hashing password...
   [+] User 'jsmith' created  (role=superuser)
-  ... Commit job 42 queued (partial (admin=admin)) — polling...
+  ... Commit job 42 queued (partial) — polling...
   [+] Commit job 42 succeeded
 
 [2/2] 192.168.1.2
 --------------------------------------------------------------------
   ... Hashing password...
   [+] User 'jsmith' created  (role=superuser)
-  ... Commit job 43 queued (partial (admin=admin)) — polling...
+  ... Commit job 43 queued (partial) — polling...
   [+] Commit job 43 succeeded
 
 ====================================================================
