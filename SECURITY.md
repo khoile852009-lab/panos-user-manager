@@ -8,4 +8,4 @@
 
 ## Reporting a Vulnerability
 
-please email admin@thecyberdefenders.com
+Submit here: https://github.com/snell-evan-itt/panos-user-manager/security/advisories/new
