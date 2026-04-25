@@ -70,20 +70,18 @@ jobs:
           --clean
           panos_manage_user.py
 
-      - name: Sign binary
-        env:
-          CODESIGN_PFX_B64: ${{ secrets.CODESIGN_PFX_B64 }}
-          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
-        shell: powershell
-        run: |
-          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODESIGN_PFX_B64))
-          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
-            Sort-Object FullName | Select-Object -Last 1).FullName
-          & $signtool sign /fd SHA256 /p "$env:CODESIGN_PFX_PASSWORD" /f $pfxPath `
-            /d "PAN-OS User Manager" /du "https://github.com/${{ github.repository }}" `
-            dist\panos_manage_user.exe
-          Remove-Item $pfxPath -Force
+      # Pending Azure Trusted Signing identity validation — uncomment when approved.
+      #- name: Sign binary (Authenticode)
+      #  uses: azure/trusted-signing-action@v0
+      #  with:
+      #    azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #    azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #    azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+      #    endpoint: https://cus.codesigning.azure.net/
+      #    trusted-signing-account-name: The-Cyber-Defenders
+      #    certificate-profile-name: GitHub_Action
+      #    files-folder: dist
+      #    files-folder-filter: exe
 
       - name: Upload artifact
         id: upload
