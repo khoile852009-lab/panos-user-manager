@@ -27,6 +27,38 @@ Pre-built binaries are available from the [Releases](../../releases) page.
 | Windows  | `panos_manage_user-windows.exe` |
 | Linux    | `panos_manage_user-linux` |
 
+### Verifying downloads
+
+Each release includes a `SHA256SUMS.txt` file and GPG detached signatures (`.sig`).
+
+#### SHA-256 checksum (quickest)
+
+Windows (PowerShell):
+
+```powershell
+Get-FileHash panos_manage_user-windows.exe -Algorithm SHA256
+# Compare output to the hash in SHA256SUMS.txt
+```
+
+Linux:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+#### GPG signature (strongest)
+
+```bash
+# Import the public key (first time only)
+gpg --keyserver keys.openpgp.org --recv-keys 8E234342277586D9
+
+# Verify
+gpg --verify panos_manage_user-windows.exe.sig panos_manage_user-windows.exe
+gpg --verify panos_manage_user-linux.sig panos_manage_user-linux
+```
+
+The Windows binary is additionally signed with Authenticode (publisher: *The Cyber Defenders*). Windows will show this in Properties → Digital Signatures.
+
 ---
 
 ## Running from source

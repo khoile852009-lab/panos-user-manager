@@ -148,6 +148,11 @@ jobs:
           mv artifacts/linux/panos_manage_user dist/panos_manage_user-linux
           chmod +x dist/panos_manage_user-linux
 
+      - name: Generate SHA-256 checksums
+        run: |
+          sha256sum dist/panos_manage_user-windows.exe dist/panos_manage_user-linux > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+
       - name: Sign release binaries
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -174,7 +179,22 @@ jobs:
             | Windows  | `panos_manage_user-windows.exe` | `panos_manage_user-windows.exe.sig` |
             | Linux    | `panos_manage_user-linux` | `panos_manage_user-linux.sig` |
 
-            ### Verify signatures
+            ### Verify SHA-256 checksums
+
+            Download `SHA256SUMS.txt` alongside the binary, then:
+
+            **Windows (PowerShell)**
+            ```powershell
+            Get-FileHash panos_manage_user-windows.exe -Algorithm SHA256
+            # Compare the hash to the value in SHA256SUMS.txt
+            ```
+
+            **Linux**
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
+
+            ### Verify GPG signatures
 
             ```bash
             # Import the public key (first time only)
@@ -206,5 +226,6 @@ jobs:
             dist/panos_manage_user-linux
             dist/panos_manage_user-windows.exe.sig
             dist/panos_manage_user-linux.sig
+            dist/SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
