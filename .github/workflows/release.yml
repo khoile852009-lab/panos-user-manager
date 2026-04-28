@@ -70,18 +70,17 @@ jobs:
           --clean
           panos_manage_user.py
 
-      # Pending Azure Trusted Signing identity validation — uncomment when approved.
-      #- name: Sign binary (Authenticode)
-      #  uses: azure/trusted-signing-action@v0
-      #  with:
-      #    azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      #    azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      #    azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-      #    endpoint: https://cus.codesigning.azure.net/
-      #    trusted-signing-account-name: The-Cyber-Defenders
-      #    certificate-profile-name: GitHub_Action
-      #    files-folder: dist
-      #    files-folder-filter: exe
+      - name: Sign binary (Authenticode)
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://cus.codesigning.azure.net/
+          trusted-signing-account-name: The-Cyber-Defenders
+          certificate-profile-name: Github-Action
+          files-folder: dist
+          files-folder-filter: exe
 
       - name: Upload artifact
         id: upload
